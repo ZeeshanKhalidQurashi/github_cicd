@@ -7,7 +7,7 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
@@ -29,7 +29,7 @@ jobs:
 
   deploy:
     needs: build
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
@@ -51,7 +51,7 @@ jobs:
 
   test:
     needs: deploy
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     container: curlimages/curl:latest
     steps:
       - name: Checkout code

@@ -1,7 +1,7 @@
 name: CI
 on: [push]
 env:
-  DOCKER_IMAGE: ibtahaj99/my-nginx-html-server  # Update with your Docker Hub username
+  DOCKER_IMAGE: zeeshan1122/my-nginx-html-server  # Update with your Docker Hub username
   DOCKER_TAG: latest  # Tag for the Docker image
 jobs:
   build:
@@ -39,5 +39,5 @@ jobs:
       - name: Test if the server is up
         run: |
           sleep 60
-          curl -v http://103.151.111.190:8080 || true
-          test $(curl -s -o /dev/null -w "%{http_code}" http://103.151.111.190:8080) -eq 200
+          curl -v http://103.151.111.241:8080 || true
+          test $(curl -s -o /dev/null -w "%{http_code}" http://103.151.111.241:8080) -eq 200

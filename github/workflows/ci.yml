@@ -1,0 +1,66 @@
+name: CI Pipeline
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+
+      - name: Log in to Docker Hub
+        run: echo "${{ secrets.DOCKER_REGISTRY_PASSWORD }}" | docker login ${{ secrets.DOCKER_REGISTRY }} -u ${{ secrets.DOCKER_REGISTRY_USERNAME }} --password-stdin
+
+      - name: Build Docker image
+        run: |
+          echo "Building Docker image..."
+          if [ -z "${{ secrets.DOCKER_REGISTRY_USERNAME }}" ] || [ -z "${{ secrets.DOCKER_REGISTRY_PASSWORD }}" ]; then
+            echo "Docker registry credentials are missing";
+            exit 1;
+          fi
+          docker build -t ${{ secrets.DOCKER_IMAGE }} . || { echo 'Docker build failed'; exit 1; }
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+
+      - name: Log in to Docker Hub
+        run: echo "${{ secrets.DOCKER_REGISTRY_PASSWORD }}" | docker login ${{ secrets.DOCKER_REGISTRY }} -u ${{ secrets.DOCKER_REGISTRY_USERNAME }} --password-stdin
+
+      - name: Deploy Docker container
+        run: |
+          echo "Deploying Docker container..."
+          docker stop my-nginx-html-server || true
+          docker rm my-nginx-html-server || true
+          docker run -d --name my-nginx-html-server -p 8080:8080 ${{ secrets.DOCKER_IMAGE }} || { echo 'Docker run failed'; exit 1; }
+          docker ps  # List running containers to verify
+          docker logs my-nginx-html-server  # Check logs for errors
+
+  test:
+    needs: deploy
+    runs-on: ubuntu-latest
+    container: curlimages/curl:latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Test if the servers are up
+        run: |
+          echo "Testing if the servers are up..."
+          sleep 60  # Increased sleep time to allow containers to start
+          echo "Fetching status from http://103.151.111.241:8080"
+          curl -v http://103.151.111.241:8080 || { echo 'Curl command failed'; exit 1; }
+          [[ $(curl -s -o /dev/null -w "%{http_code}" http://103.151.111.241:8080) == "200" ]] || { echo 'HTTP status is not 200'; exit 1; }

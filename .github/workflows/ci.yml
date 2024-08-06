@@ -1,78 +1,43 @@
-name: CI Pipeline
-
-on:
-  push:
-    branches:
-      - main
-
+name: CI
+on: [push]
+env:
+  DOCKER_IMAGE: ibtahaj99/my-nginx-html-server  # Update with your Docker Hub username
+  DOCKER_TAG: latest  # Tag for the Docker image
 jobs:
   build:
     runs-on: self-hosted
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v2
-
-      - name: Docker info
-        run: docker info
-
-      - name: Buildx version
-        run: docker buildx version
-
-      - name: Log in to Docker Hub
-        run: echo "${{ secrets.DOCKER_REGISTRY_PASSWORD }}" | docker login ${{ secrets.DOCKER_REGISTRY }} -u ${{ secrets.DOCKER_REGISTRY_USERNAME }} --password-stdin
-
-      - name: Build Docker image
-        run: |
-          echo "Building Docker image..."
-          if [ -z "${{ secrets.DOCKER_REGISTRY_USERNAME }}" ] || [ -z "${{ secrets.DOCKER_REGISTRY_PASSWORD }}" ]; then
-            echo "Docker registry credentials are missing";
-            exit 1;
-          fi
-          docker build -t ${{ secrets.DOCKER_IMAGE }} . || { echo 'Docker build failed'; exit 1; }
-
+    - name: Checkout code
+      uses: actions/checkout@v2
+    - name: Log in to Docker Hub
+      run: echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
+    - name: Build Docker image
+      run: docker build -t ${{ env.DOCKER_IMAGE }}:${{ env.DOCKER_TAG }} .
+    - name: Push Docker image
+      run: docker push ${{ env.DOCKER_IMAGE }}:${{ env.DOCKER_TAG }}
   deploy:
-    needs: build
     runs-on: self-hosted
+    needs: build
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v2
-
-      - name: Docker info
-        run: docker info
-
-      - name: Buildx version
-        run: docker buildx version
-
+        uses: actions/checkout@v2
       - name: Log in to Docker Hub
-        run: echo "${{ secrets.DOCKER_REGISTRY_PASSWORD }}" | docker login ${{ secrets.DOCKER_REGISTRY }} -u ${{ secrets.DOCKER_REGISTRY_USERNAME }} --password-stdin
-
+        run: echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
       - name: Deploy Docker container
         run: |
-          echo "Deploying Docker container..."
           docker stop my-nginx-html-server || true
           docker rm my-nginx-html-server || true
-          docker run -d --name my-nginx-html-server -p 8080:8080 ${{ secrets.DOCKER_IMAGE }} || { echo 'Docker run failed'; exit 1; }
-          docker ps  # List running containers to verify
-          docker logs my-nginx-html-server  # Check logs for errors
-
+          docker run -d --name my-nginx-html-server -p 8080:8080 ${{ env.DOCKER_IMAGE }}:${{ env.DOCKER_TAG }}
+          docker ps
+          docker logs my-nginx-html-server
   test:
-    needs: deploy
     runs-on: self-hosted
-    container: curlimages/curl:latest
+    needs: deploy
+    container:
+      image: curlimages/curl:latest
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
-
-      - name: Test if the servers are up
+      - name: Test if the server is up
         run: |
-          echo "Testing if the servers are up..."
-          sleep 60  # Increased sleep time to allow containers to start
-          echo "Fetching status from http://103.151.111.241:8080"
-          curl -v http://103.151.111.241:8080 || { echo 'Curl command failed'; exit 1; }
-          [[ $(curl -s -o /dev/null -w "%{http_code}" http://103.151.111.241:8080) == "200" ]] || { echo 'HTTP status is not 200'; exit 1; }
+          sleep 60
+          curl -v http://103.151.111.190:8080 || true
+          test $(curl -s -o /dev/null -w "%{http_code}" http://103.151.111.190:8080) -eq 200
